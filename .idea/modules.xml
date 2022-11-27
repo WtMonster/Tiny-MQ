@@ -3,6 +3,11 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Tiny-MQ.iml" filepath="$PROJECT_DIR$/.idea/Tiny-MQ.iml" />
+      <module fileurl="file://$PROJECT_DIR$/mq-broker/mq-broker.iml" filepath="$PROJECT_DIR$/mq-broker/mq-broker.iml" />
+      <module fileurl="file://$PROJECT_DIR$/mq-common/mq-common.iml" filepath="$PROJECT_DIR$/mq-common/mq-common.iml" />
+      <module fileurl="file://$PROJECT_DIR$/mq-consumer/mq-consumer.iml" filepath="$PROJECT_DIR$/mq-consumer/mq-consumer.iml" />
+      <module fileurl="file://$PROJECT_DIR$/mq-producer/mq-producer.iml" filepath="$PROJECT_DIR$/mq-producer/mq-producer.iml" />
+      <module fileurl="file://$PROJECT_DIR$/mq-test/mq-test.iml" filepath="$PROJECT_DIR$/mq-test/mq-test.iml" />
     </modules>
   </component>
 </project>

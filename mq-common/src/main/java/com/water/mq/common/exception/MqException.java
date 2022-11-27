@@ -1,4 +1,4 @@
-package com.water.mq.common.mq.common.exception;
+package com.water.mq.common.exception;
 
 import com.github.houbb.heaven.response.respcode.RespCode;
 

@@ -1,6 +1,6 @@
 package com.water.mq.producer.api;
 
-import com.water.mq.common.mq.common.dto.MqMessage;
+import com.water.mq.common.dto.req.MqMessage;
 import com.water.mq.producer.dto.SendResult;
 
 /**

@@ -21,8 +21,8 @@
         </dependency>
 
         <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>mq-broker</artifactId>
+            <groupId>com.github.houbb</groupId>
+            <artifactId>id-core</artifactId>
         </dependency>
     </dependencies>
 

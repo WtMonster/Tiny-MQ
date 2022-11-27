@@ -5,8 +5,9 @@ package com.water.mq.producer.constant;
  * @date 2022/11/27 16:07
  */
 public enum SendStatus {
-    S("S", "成功"),
-    F("F", "失败");
+    SUCCESS("SUCCESS", "发送成功"),
+    FAILED("FAILED", "发送失败"),
+    ;
 
     private final String code;
     private final String desc;

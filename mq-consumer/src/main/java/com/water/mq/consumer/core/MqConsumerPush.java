@@ -1,5 +1,9 @@
 package com.water.mq.consumer.core;
 
+import com.water.mq.common.exception.MqException;
+import com.water.mq.common.support.invoke.IInvokeService;
+import com.water.mq.common.support.invoke.impl.InvokeService;
+import com.water.mq.common.util.DelimiterUtil;
 import com.water.mq.consumer.api.IMqConsumer;
 import com.water.mq.consumer.api.IMqConsumerListener;
 import com.github.houbb.log.integration.core.Log;
@@ -7,11 +11,12 @@ import com.github.houbb.log.integration.core.LogFactory;
 import com.water.mq.consumer.constant.ConsumerConst;
 import com.water.mq.consumer.constant.ConsumerRespCode;
 import com.water.mq.consumer.handler.MqConsumerHandler;
-import com.water.mq.common.mq.common.exception.MqException;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.DelimiterBasedFrameDecoder;
 
 /**
  * 推送消费策略
@@ -29,6 +34,8 @@ public class MqConsumerPush  extends Thread implements IMqConsumer{
      */
     private final String groupName;
 
+
+
     /**
      * 端口号
      */
@@ -38,6 +45,17 @@ public class MqConsumerPush  extends Thread implements IMqConsumer{
      * 中间人地址
      */
     private String brokerAddress  = "";
+
+    /**
+     * 分隔符
+     */
+    private String delimiter = DelimiterUtil.DELIMITER;
+
+    /**
+     * 调用管理类
+     */
+    private final IInvokeService invokeService = new InvokeService();
+
 
     public MqConsumerPush(String groupName, int port) {
         this.groupName = groupName;
@@ -59,35 +77,39 @@ public class MqConsumerPush  extends Thread implements IMqConsumer{
     @Override
     public void run() {
         // 启动服务端
-        log.info("MQ 生产者开始启动服务端 groupName: {}, port: {}, brokerAddress: {}",
+        log.info("MQ 消费者开始启动服务端 groupName: {}, port: {}, brokerAddress: {}",
                 groupName, port, brokerAddress);
 
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();
 
         try {
+            final ByteBuf delimiterBuf = DelimiterUtil.getByteBuf(delimiter);
+
             ServerBootstrap serverBootstrap = new ServerBootstrap();
             serverBootstrap.group(workerGroup, bossGroup)
                     .channel(NioServerSocketChannel.class)
                     .childHandler(new ChannelInitializer<Channel>() {
                         @Override
                         protected void initChannel(Channel ch) throws Exception {
-                            ch.pipeline().addLast(new MqConsumerHandler());
+                            ch.pipeline()
+                                    .addLast(new DelimiterBasedFrameDecoder(DelimiterUtil.LENGTH, delimiterBuf))
+                                    .addLast(new MqConsumerHandler(invokeService));
                         }
                     })
-                    // 这个参数影响的是还没有被 accept 取出的连接
+                    // 这个参数影响的是还没有被accept 取出的连接
                     .option(ChannelOption.SO_BACKLOG, 128)
                     // 这个参数只是过一段时间内客户端没有响应，服务端会发送一个 ack 包，以判断客户端是否还活着。
                     .childOption(ChannelOption.SO_KEEPALIVE, true);
 
             // 绑定端口，开始接收进来的链接
             ChannelFuture channelFuture = serverBootstrap.bind(port).syncUninterruptibly();
-            log.info("MQ 生产者启动完成，监听【" + port + "】端口");
+            log.info("MQ 消费者启动完成，监听【" + port + "】端口");
 
             channelFuture.channel().closeFuture().syncUninterruptibly();
-            log.info("MQ 生产者关闭完成");
+            log.info("MQ 消费者关闭完成");
         } catch (Exception e) {
-            log.error("MQ 生产者启动异常", e);
+            log.error("MQ 消费者启动异常", e);
             throw new MqException(ConsumerRespCode.RPC_INIT_FAILED);
         } finally {
             workerGroup.shutdownGracefully();
@@ -96,6 +118,7 @@ public class MqConsumerPush  extends Thread implements IMqConsumer{
 
 
     }
+
 
 
     @Override

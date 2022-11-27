@@ -1,13 +1,13 @@
-package com.water.mq.common.mq.common.dto;
+package com.water.mq.common.dto.req;
 
 import java.util.Arrays;
 import java.util.List;
 
 /**
- * @author WtMonster
- * @date 2022/11/27 16:07
+ * @author binbin.hou
+ * @since 1.0.0
  */
-public class MqMessage {
+public class MqMessage extends MqCommonReq {
 
     /**
      * 标题名称

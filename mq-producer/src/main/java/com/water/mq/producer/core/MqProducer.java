@@ -1,34 +1,38 @@
 package com.water.mq.producer.core;
 
 import com.alibaba.fastjson.JSON;
+import com.github.houbb.heaven.util.common.ArgUtil;
+import com.github.houbb.heaven.util.util.DateUtil;
 import com.github.houbb.id.core.util.IdHelper;
 import com.github.houbb.log.integration.core.Log;
 import com.github.houbb.log.integration.core.LogFactory;
+import com.water.mq.broker.dto.BrokerRegisterReq;
+import com.water.mq.broker.dto.ServiceEntry;
 import com.water.mq.common.constant.MethodType;
 import com.water.mq.common.dto.req.MqCommonReq;
 import com.water.mq.common.dto.req.MqMessage;
 import com.water.mq.common.dto.resp.MqCommonResp;
-import com.water.mq.common.exception.MqCommonRespCode;
-import com.water.mq.common.exception.MqException;
+import com.water.mq.common.resp.MqCommonRespCode;
+import com.water.mq.common.resp.MqException;
+import com.water.mq.common.rpc.RpcChannelFuture;
 import com.water.mq.common.rpc.RpcMessageDto;
 import com.water.mq.common.support.invoke.IInvokeService;
 import com.water.mq.common.support.invoke.impl.InvokeService;
+import com.water.mq.common.util.ChannelFutureUtils;
 import com.water.mq.common.util.ChannelUtil;
 import com.water.mq.common.util.DelimiterUtil;
+import com.water.mq.common.util.RandomUtils;
 import com.water.mq.producer.api.IMqProducer;
 import com.water.mq.producer.constant.ProducerConst;
 import com.water.mq.producer.constant.ProducerRespCode;
 import com.water.mq.producer.constant.SendStatus;
 import com.water.mq.producer.dto.SendResult;
 import com.water.mq.producer.handler.MqProducerHandler;
-import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.DelimiterBasedFrameDecoder;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
+
+import java.util.List;
 
 /**
  * @author WtMonster
@@ -51,7 +55,7 @@ public class MqProducer extends Thread implements IMqProducer {
     /**
      * 中间人地址
      */
-    private String brokerAddress  = "";
+    private String brokerAddress  = "127.0.0.1:9999";
 
     /**
      * channel 信息
@@ -90,6 +94,13 @@ public class MqProducer extends Thread implements IMqProducer {
     private String delimiter = DelimiterUtil.DELIMITER;
 
 
+    /**
+     * 请求列表
+     * @since 0.0.3
+     */
+    private List<RpcChannelFuture> channelFutureList;
+
+
     public void setDelimiter(String delimiter) {
         this.delimiter = delimiter;
     }
@@ -119,7 +130,7 @@ public class MqProducer extends Thread implements IMqProducer {
         return enableFlag;
     }
 
-    private void initChannelHandler() {
+    private ChannelHandler initChannelHandler() {
         final ByteBuf delimiterBuf = DelimiterUtil.getByteBuf(delimiter);
 
         final MqProducerHandler mqProducerHandler = new MqProducerHandler();
@@ -137,42 +148,65 @@ public class MqProducer extends Thread implements IMqProducer {
         };
 
         this.channelHandler = handler;
+
+        return handler;
+    }
+
+    /**
+     * 参数校验
+     */
+    private void paramCheck() {
+        ArgUtil.notEmpty(brokerAddress, "brokerAddress");
     }
 
     @Override
     public synchronized void run() {
+        this.paramCheck();
+
         // 启动服务端
         log.info("MQ 生产者开始启动客户端 GROUP: {}, PORT: {}, brokerAddress: {}",
                 groupName, port, brokerAddress);
 
-        EventLoopGroup workerGroup = new NioEventLoopGroup();
-
         try {
             // channel handler
-            this.initChannelHandler();
+            ChannelHandler channelHandler = this.initChannelHandler();
 
-            Bootstrap bootstrap = new Bootstrap();
-            channelFuture = bootstrap.group(workerGroup)
-                    .channel(NioSocketChannel.class)
-                    .option(ChannelOption.SO_KEEPALIVE, true)
-                    .handler(new ChannelInitializer<Channel>(){
-                        @Override
-                        protected void initChannel(Channel ch) throws Exception {
-                            ch.pipeline()
-                                    .addLast(new LoggingHandler(LogLevel.INFO))
-                                    .addLast(channelHandler);
-                        }
-                    })
-                    .connect("localhost", port)
-                    .syncUninterruptibly();
+            //channel future
+            this.channelFutureList = ChannelFutureUtils.initChannelFutureList(brokerAddress, channelHandler);
 
-            log.info("MQ 生产者启动客户端完成，监听端口：" + port);
+            // register to broker
+            this.registerToBroker();
 
             // 标识为可用
             enableFlag = true;
+            log.info("MQ 生产者启动完成");
         } catch (Exception e) {
             log.error("MQ 生产者启动遇到异常", e);
             throw new MqException(ProducerRespCode.RPC_INIT_FAILED);
+        }
+    }
+
+    /**
+     * 注册到所有的服务端
+     * @since 0.0.3
+     */
+    private void registerToBroker() {
+        for(RpcChannelFuture channelFuture : this.channelFutureList) {
+            ServiceEntry serviceEntry = new ServiceEntry();
+            serviceEntry.setGroupName(groupName);
+            serviceEntry.setAddress(channelFuture.getAddress());
+            serviceEntry.setPort(channelFuture.getPort());
+            serviceEntry.setWeight(channelFuture.getWeight());
+
+            BrokerRegisterReq brokerRegisterReq = new BrokerRegisterReq();
+            brokerRegisterReq.setServiceEntry(serviceEntry);
+            brokerRegisterReq.setMethodType(MethodType.P_REGISTER);
+            brokerRegisterReq.setTraceId(IdHelper.uuid32());
+
+            log.info("[Register] 开始注册到 broker：{}", JSON.toJSON(brokerRegisterReq));
+            final Channel channel = channelFuture.getChannelFuture().channel();
+            MqCommonResp resp = callServer(channel, brokerRegisterReq, MqCommonResp.class);
+            log.info("[Register] 完成注册到 broker：{}", JSON.toJSON(resp));
         }
     }
 
@@ -186,9 +220,10 @@ public class MqProducer extends Thread implements IMqProducer {
         // 生成id随机，类型为请求的消息
         String messageId = IdHelper.uuid32();
         mqMessage.setTraceId(messageId);
-        mqMessage.setMethodType(MethodType.P_SEND_MESSAGE);
+        mqMessage.setMethodType(MethodType.P_SEND_MSG);
 
-        MqCommonResp resp = callServer(mqMessage, MqCommonResp.class);
+        Channel channel = getChannel(mqMessage.getShardingKey());
+        MqCommonResp resp = callServer(channel, mqMessage, MqCommonResp.class);
         if(MqCommonRespCode.SUCCESS.getCode().equals(resp.getRespCode())) {
             return SendResult.of(messageId, SendStatus.SUCCESS);
         }
@@ -205,15 +240,17 @@ public class MqProducer extends Thread implements IMqProducer {
     public SendResult sendOneWay(MqMessage mqMessage) {
         String messageId = IdHelper.uuid32();
         mqMessage.setTraceId(messageId);
-        mqMessage.setMethodType(MethodType.P_SEND_MESSAGE);
+        mqMessage.setMethodType(MethodType.P_SEND_MSG);
 
-        this.callServer(mqMessage, null);
+        Channel channel = getChannel(mqMessage.getShardingKey());
+        this.callServer(channel, mqMessage, null);
 
         return SendResult.of(messageId, SendStatus.SUCCESS);
     }
 
     /**
      * 调用服务端
+     * @param channel 调用通道
      * @param commonReq 通用请求
      * @param respClass 类
      * @param <T> 泛型
@@ -221,7 +258,9 @@ public class MqProducer extends Thread implements IMqProducer {
      * @return 结果
      * @since 1.0.0
      */
-    public <T extends MqCommonReq, R extends MqCommonResp> R callServer(T commonReq, Class<R> respClass) {
+    private <T extends MqCommonReq, R extends MqCommonResp> R callServer(Channel channel,
+                                                                         T commonReq,
+                                                                         Class<R> respClass) {
         final String traceId = commonReq.getTraceId();
         final long requestTime = System.currentTimeMillis();
 
@@ -241,7 +280,6 @@ public class MqProducer extends Thread implements IMqProducer {
         ByteBuf byteBuf = DelimiterUtil.getMessageDelimiterBuffer(rpcMessageDto);
 
         //负载均衡获取 channel
-        Channel channel = channelFuture.channel();
         channel.writeAndFlush(byteBuf);
 
         String channelId = ChannelUtil.getChannelId(channel);
@@ -263,5 +301,21 @@ public class MqProducer extends Thread implements IMqProducer {
         }
     }
 
+
+    /**
+     * 获取请求通道
+     * @param key 标识
+     * @return 结果
+     */
+    private Channel getChannel(String key) {
+        // 等待启动完成
+        while (!enableFlag) {
+            log.debug("等待初始化完成...");
+            DateUtil.sleep(100);
+        }
+
+        RpcChannelFuture rpcChannelFuture = RandomUtils.random(channelFutureList, key);
+        return rpcChannelFuture.getChannelFuture().channel();
+    }
 
 }

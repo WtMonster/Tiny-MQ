@@ -1,6 +1,6 @@
 package com.water.mq.common.rpc;
 
-import com.water.mq.common.exception.MqCommonRespCode;
+import com.water.mq.common.resp.MqCommonRespCode;
 
 import java.io.Serializable;
 

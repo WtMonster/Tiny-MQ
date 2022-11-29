@@ -17,20 +17,14 @@ public class ProducerMain {
     public static void main(String[] args) {
         MqProducer mqProducer = new MqProducer();
         mqProducer.start();
-
-        //等待启动完成
-        while (!mqProducer.isEnableFlag()) {
-            System.out.println("等待初始化完成...");
-            DateUtil.sleep(100);
-        }
-
         String message = "HELLO MQ!";
         MqMessage mqMessage = new MqMessage();
         mqMessage.setTopic("TOPIC");
         mqMessage.setTags(Arrays.asList("TAGA", "TAGB"));
-        mqMessage.setPayload(message.getBytes(StandardCharsets.UTF_8));
+        mqMessage.setPayload(message);
 
         SendResult sendResult = mqProducer.send(mqMessage);
+
         System.out.println(JSON.toJSON(sendResult));
     }
 }

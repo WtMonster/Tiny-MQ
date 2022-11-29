@@ -1,4 +1,4 @@
-package com.water.mq.consumer.constant;
+package com.water.mq.common.resp;
 
 /**
  * 消费状态

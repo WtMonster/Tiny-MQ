@@ -1,7 +1,7 @@
 package com.water.mq.consumer.api;
 
-import com.water.mq.consumer.constant.ConsumerStatus;
-import com.water.mq.consumer.dto.MqMessage;
+import com.water.mq.common.dto.req.MqMessage;
+import com.water.mq.common.resp.ConsumerStatus;
 
 public interface IMqConsumerListener {
     /**

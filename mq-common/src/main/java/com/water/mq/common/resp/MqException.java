@@ -1,10 +1,10 @@
-package com.water.mq.common.exception;
+package com.water.mq.common.resp;
 
 import com.github.houbb.heaven.response.respcode.RespCode;
 
 /**
- * @author WtMonster
- * @date 2022/11/27 16:07
+ * @author binbin.hou
+ * @since 1.0.0
  */
 public class MqException extends RuntimeException {
 

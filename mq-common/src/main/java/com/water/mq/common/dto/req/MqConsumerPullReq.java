@@ -1,13 +1,12 @@
 package com.water.mq.common.dto.req;
 
-import java.util.Arrays;
 import java.util.List;
 
 /**
  * @author binbin.hou
  * @since 1.0.0
  */
-public class MqMessage extends MqCommonReq {
+public class MqConsumerPullReq extends MqCommonReq {
 
     /**
      * 分组名称
@@ -21,24 +20,13 @@ public class MqMessage extends MqCommonReq {
 
     /**
      * 标签
-     * TODO: 这里用Set会不会好一点
      */
     private List<String> tags;
 
     /**
-     * 内容
+     * 拉取大小
      */
-    private String payload;
-
-    /**
-     * 业务标识
-     */
-    private String bizKey;
-
-    /**
-     * 负载分片标识
-     */
-    private String shardingKey;
+    private int size;
 
     public String getGroupName() {
         return groupName;
@@ -64,28 +52,21 @@ public class MqMessage extends MqCommonReq {
         this.tags = tags;
     }
 
-    public String getPayload() {
-        return payload;
+    public int getSize() {
+        return size;
     }
 
-    public void setPayload(String payload) {
-        this.payload = payload;
+    public void setSize(int size) {
+        this.size = size;
     }
 
-    public String getBizKey() {
-        return bizKey;
-    }
-
-    public void setBizKey(String bizKey) {
-        this.bizKey = bizKey;
-    }
-
-    public String getShardingKey() {
-        return shardingKey;
-    }
-
-    public void setShardingKey(String shardingKey) {
-        this.shardingKey = shardingKey;
+    @Override
+    public String toString() {
+        return "MqConsumerPullReq{" +
+                "topic='" + topic + '\'' +
+                ", tags=" + tags +
+                ", size=" + size +
+                "} " + super.toString();
     }
 
 }

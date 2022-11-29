@@ -14,7 +14,7 @@ import java.util.Arrays;
  * @date 2022/11/27 16:14
  */
 public class ProducerMain {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         MqProducer mqProducer = new MqProducer();
         mqProducer.start();
         String message = "HELLO MQ!";
@@ -24,7 +24,11 @@ public class ProducerMain {
         mqMessage.setPayload(message);
 
         SendResult sendResult = mqProducer.send(mqMessage);
+        mqProducer.send(mqMessage);
+        mqProducer.send(mqMessage);
 
         System.out.println(JSON.toJSON(sendResult));
+
+        System.exit(0);
     }
 }

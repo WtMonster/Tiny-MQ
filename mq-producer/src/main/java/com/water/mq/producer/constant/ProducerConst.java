@@ -13,9 +13,5 @@ public final class ProducerConst {
      */
     public static final String DEFAULT_GROUP_NAME = "P_DEFAULT_GROUP_NAME";
 
-    /**
-     * 默认端口号
-     */
-    public static final int DEFAULT_PORT = 9527;
 
 }

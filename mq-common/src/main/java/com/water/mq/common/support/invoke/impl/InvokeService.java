@@ -130,4 +130,11 @@ public class InvokeService implements IInvokeService {
         }
     }
 
+
+    @Override
+    public boolean
+
+    remainsRequest() {
+        return this.requestMap.size() > 0;
+    }
 }

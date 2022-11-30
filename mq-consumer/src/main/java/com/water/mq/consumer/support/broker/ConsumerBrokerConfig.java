@@ -1,6 +1,10 @@
 package com.water.mq.consumer.support.broker;
 
 
+import com.github.houbb.heaven.util.common.ArgUtil;
+import com.github.houbb.load.balance.api.ILoadBalance;
+import com.github.houbb.load.balance.api.impl.LoadBalances;
+import com.water.mq.common.rpc.RpcChannelFuture;
 import com.water.mq.common.support.invoke.IInvokeService;
 import com.water.mq.common.support.status.IStatusManager;
 import com.water.mq.consumer.support.listener.IMqListenerService;
@@ -50,6 +54,19 @@ public class ConsumerBrokerConfig {
      * @since 0.0.5
      */
     private IMqListenerService mqListenerService;
+
+    /**
+     * 负载均衡策略
+     * @since 0.0.7
+     */
+    private ILoadBalance<RpcChannelFuture> loadBalance = LoadBalances.weightRoundRobbin();
+
+    public void setLoadBalance(ILoadBalance<RpcChannelFuture> loadBalance) {
+        ArgUtil.notNull(loadBalance, "loadBalance");
+
+        this.loadBalance = loadBalance;
+    }
+
 
     public static ConsumerBrokerConfig newInstance() {
         return new ConsumerBrokerConfig();
@@ -115,6 +132,16 @@ public class ConsumerBrokerConfig {
 
     public ConsumerBrokerConfig mqListenerService(IMqListenerService mqListenerService) {
         this.mqListenerService = mqListenerService;
+        return this;
+    }
+
+
+    public ILoadBalance<RpcChannelFuture> loadBalance() {
+        return loadBalance;
+    }
+
+    public ConsumerBrokerConfig loadBalance(ILoadBalance<RpcChannelFuture> loadBalance) {
+        this.loadBalance = loadBalance;
         return this;
     }
 }

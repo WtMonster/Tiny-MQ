@@ -5,6 +5,8 @@ import com.github.houbb.heaven.util.common.ArgUtil;
 import com.github.houbb.heaven.util.util.DateUtil;
 import com.github.houbb.heaven.util.util.RandomUtil;
 import com.github.houbb.id.core.util.IdHelper;
+import com.github.houbb.load.balance.api.ILoadBalance;
+import com.github.houbb.load.balance.api.impl.LoadBalances;
 import com.water.mq.broker.dto.BrokerRegisterReq;
 import com.water.mq.broker.dto.ServiceEntry;
 import com.water.mq.broker.dto.consumer.ConsumerSubscribeReq;
@@ -108,6 +110,19 @@ public class MqConsumerPush  extends Thread implements IMqConsumer{
      */
     private final IConsumerBrokerService consumerBrokerService = new ConsumerBrokerService();
 
+    /**
+     * 负载均衡策略
+     * @since 0.0.7
+     */
+    private ILoadBalance<RpcChannelFuture> loadBalance = LoadBalances.weightRoundRobbin();
+
+    public void setLoadBalance(ILoadBalance<RpcChannelFuture> loadBalance) {
+        ArgUtil.notNull(loadBalance, "loadBalance");
+
+        this.loadBalance = loadBalance;
+    }
+
+
     public void setGroupName(String groupName) {
         this.groupName = groupName;
     }
@@ -155,7 +170,9 @@ public class MqConsumerPush  extends Thread implements IMqConsumer{
                     .respTimeoutMills(respTimeoutMills)
                     .invokeService(invokeService)
                     .statusManager(statusManager)
-                    .mqListenerService(mqListenerService);
+                    .mqListenerService(mqListenerService)
+                    .mqListenerService(mqListenerService)
+                    .loadBalance(loadBalance);
 
             //1. 初始化
             this.consumerBrokerService.initChannelFutureList(config);

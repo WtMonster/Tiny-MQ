@@ -1,5 +1,7 @@
 package com.water.mq.producer.support.broker;
 
+import com.github.houbb.load.balance.api.ILoadBalance;
+import com.water.mq.common.rpc.RpcChannelFuture;
 import com.water.mq.common.support.invoke.IInvokeService;
 import com.water.mq.common.support.status.IStatusManager;
 
@@ -42,6 +44,13 @@ public class ProducerBrokerConfig {
      * @since 0.0.5
      */
     private IStatusManager statusManager;
+
+    /**
+     * 负载均衡
+     * @since 0.0.7
+     */
+    private ILoadBalance<RpcChannelFuture> loadBalance;
+
 
     public static ProducerBrokerConfig newInstance() {
         return new ProducerBrokerConfig();
@@ -98,6 +107,16 @@ public class ProducerBrokerConfig {
 
     public ProducerBrokerConfig statusManager(IStatusManager statusManager) {
         this.statusManager = statusManager;
+        return this;
+    }
+
+
+    public ILoadBalance<RpcChannelFuture> loadBalance() {
+        return loadBalance;
+    }
+
+    public ProducerBrokerConfig loadBalance(ILoadBalance<RpcChannelFuture> loadBalance) {
+        this.loadBalance = loadBalance;
         return this;
     }
 }

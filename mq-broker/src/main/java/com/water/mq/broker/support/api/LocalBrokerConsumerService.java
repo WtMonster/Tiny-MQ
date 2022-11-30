@@ -2,6 +2,7 @@ package com.water.mq.broker.support.api;
 
 import com.alibaba.fastjson.JSON;
 import com.github.houbb.heaven.util.util.CollectionUtil;
+import com.github.houbb.load.balance.api.ILoadBalance;
 import com.github.houbb.log.integration.core.Log;
 import com.github.houbb.log.integration.core.LogFactory;
 import com.water.mq.broker.api.IBrokerConsumerService;
@@ -19,7 +20,6 @@ import com.water.mq.common.util.ChannelUtil;
 import com.water.mq.common.util.RandomUtils;
 import com.water.mq.common.util.RegexUtils;
 import io.netty.channel.Channel;
-
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -57,6 +57,14 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
      */
     private static final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
+    /**
+     * 负载均衡策略
+     * @since 0.0.7
+     */
+    private ILoadBalance<ConsumerSubscribeBo> loadBalance;
+
+
+
     public LocalBrokerConsumerService() {
         //120S 扫描一次
         final long limitMills = 2 * 60 * 1000;
@@ -74,6 +82,11 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
                 }
             }
         }, 2 * 60, 2 * 60, TimeUnit.SECONDS);
+    }
+
+    @Override
+    public void loadBalance(ILoadBalance<ConsumerSubscribeBo> loadBalance) {
+        this.loadBalance = loadBalance;
     }
 
 
@@ -198,7 +211,7 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
         for(Map.Entry<String, List<ConsumerSubscribeBo>> entry : groupMap.entrySet()) {
             List<ConsumerSubscribeBo> list = entry.getValue();
 
-            ConsumerSubscribeBo bo = RandomUtils.random(list, shardingKey);
+            ConsumerSubscribeBo bo = RandomUtils.loadBalance(loadBalance, list, shardingKey);
             final String channelId = bo.getChannelId();
             BrokerServiceEntryChannel entryChannel = registerMap.get(channelId);
             if(entryChannel == null) {

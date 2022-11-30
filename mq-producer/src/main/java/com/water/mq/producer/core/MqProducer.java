@@ -4,6 +4,8 @@ import com.alibaba.fastjson.JSON;
 import com.github.houbb.heaven.util.common.ArgUtil;
 import com.github.houbb.heaven.util.util.DateUtil;
 import com.github.houbb.id.core.util.IdHelper;
+import com.github.houbb.load.balance.api.ILoadBalance;
+import com.github.houbb.load.balance.api.impl.LoadBalances;
 import com.github.houbb.log.integration.core.Log;
 import com.github.houbb.log.integration.core.LogFactory;
 import com.water.mq.broker.dto.BrokerRegisterReq;
@@ -95,6 +97,18 @@ public class MqProducer extends Thread implements IMqProducer {
      */
     private long waitMillsForRemainRequest = 60 * 1000;
 
+    /**
+     * 负载均衡策略
+     * @since 0.0.7
+     */
+    private ILoadBalance<RpcChannelFuture> loadBalance = LoadBalances.weightRoundRobbin();
+
+    public void setLoadBalance(ILoadBalance<RpcChannelFuture> loadBalance) {
+        ArgUtil.notNull(loadBalance, "loadBalance");
+
+        this.loadBalance = loadBalance;
+    }
+
     public void setGroupName(String groupName) {
         ArgUtil.notEmpty(groupName, "groupName");
 
@@ -143,7 +157,8 @@ public class MqProducer extends Thread implements IMqProducer {
                     .check(check)
                     .respTimeoutMills(respTimeoutMills)
                     .invokeService(invokeService)
-                    .statusManager(statusManager);
+                    .statusManager(statusManager)
+                    .loadBalance(loadBalance);
 
             //1. 初始化
             this.producerBrokerService.initChannelFutureList(config);

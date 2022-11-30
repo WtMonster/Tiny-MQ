@@ -1,5 +1,8 @@
 package com.water.mq.broker.dto.consumer;
 
+import com.github.houbb.load.balance.support.server.IServer;
+import com.water.mq.common.rpc.RpcAddress;
+
 import java.util.Objects;
 
 /**
@@ -7,7 +10,7 @@ import java.util.Objects;
  * @author binbin.hou
  * @since 0.0.3
  */
-public class ConsumerSubscribeBo {
+public class ConsumerSubscribeBo extends RpcAddress implements IServer {
 
     /**
      * 分组名称

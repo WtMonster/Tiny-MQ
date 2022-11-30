@@ -3,6 +3,7 @@ package com.water.mq.common.dto.req;
 import java.io.Serializable;
 
 /**
+ * TODO: 有必要用那么多不同的实现类吗？
  * @author binbin.hou
  * @since 1.0.0
  */

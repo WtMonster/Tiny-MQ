@@ -23,6 +23,7 @@ public class MqMessagePersistPut {
 
     /**
      * 消息状态
+     * TODO:这个需要是volatile吗
      */
     private String messageStatus;
 

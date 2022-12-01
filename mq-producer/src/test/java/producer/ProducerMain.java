@@ -1,12 +1,10 @@
 package producer;
 
 import com.alibaba.fastjson.JSON;
-import com.github.houbb.heaven.util.util.DateUtil;
 import com.water.mq.common.dto.req.MqMessage;
 import com.water.mq.producer.core.MqProducer;
 import com.water.mq.producer.dto.SendResult;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 /**

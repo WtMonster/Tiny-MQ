@@ -7,7 +7,6 @@ import com.github.houbb.log.integration.core.Log;
 import com.github.houbb.log.integration.core.LogFactory;
 import com.water.mq.broker.api.IBrokerConsumerService;
 import com.water.mq.broker.api.IBrokerProducerService;
-import com.water.mq.broker.constant.MessageStatusConst;
 import com.water.mq.broker.dto.BrokerRegisterReq;
 import com.water.mq.broker.dto.consumer.ConsumerSubscribeReq;
 import com.water.mq.broker.dto.consumer.ConsumerUnSubscribeReq;
@@ -15,8 +14,10 @@ import com.water.mq.broker.dto.persist.MqMessagePersistPut;
 import com.water.mq.broker.support.persist.IMqBrokerPersist;
 import com.water.mq.broker.support.push.BrokerPushContext;
 import com.water.mq.broker.support.push.IBrokerPushService;
+import com.water.mq.common.constant.MessageStatusConst;
 import com.water.mq.common.constant.MethodType;
 import com.water.mq.common.dto.req.MqConsumerPullReq;
+import com.water.mq.common.dto.req.MqConsumerUpdateStatusReq;
 import com.water.mq.common.dto.req.MqHeartBeatReq;
 import com.water.mq.common.dto.req.MqMessage;
 import com.water.mq.common.dto.resp.MqCommonResp;
@@ -194,7 +195,8 @@ public class MqBrokerHandler extends SimpleChannelInboundHandler {
 
                 // 持久化这个请求，实际就是put到mqp里面，目前并没有真正持久化
                 MqCommonResp commonResp = mqBrokerPersist.put(persistPut);
-                this.asyncHandleMessage(mqMessage);
+                // TODO: 这里为什么要从mqMessage改成persistPut
+                this.asyncHandleMessage(persistPut);
                 return commonResp;
             }
             // 生产者消息发送-ONE WAY
@@ -204,7 +206,7 @@ public class MqBrokerHandler extends SimpleChannelInboundHandler {
                 persistPut.setMqMessage(mqMessage);
                 persistPut.setMessageStatus(MessageStatusConst.WAIT_CONSUMER);
                 mqBrokerPersist.put(persistPut);
-                this.asyncHandleMessage(mqMessage);
+                this.asyncHandleMessage(persistPut);
                 return null;
             }
 
@@ -239,6 +241,13 @@ public class MqBrokerHandler extends SimpleChannelInboundHandler {
                 registerConsumerService.heartbeat(req, channel);
                 return null;
             }
+            // 消费者消费状态 ACK
+            if(MethodType.C_CONSUMER_STATUS.equals(methodType)) {
+                MqConsumerUpdateStatusReq req = JSON.parseObject(json, MqConsumerUpdateStatusReq.class);
+                final String messageId = req.getMessageId();
+                final String messageStatus = req.getMessageStatus();
+                return mqBrokerPersist.updateStatus(messageId, messageStatus);
+            }
 
             throw new UnsupportedOperationException("暂不支持的方法类型");
         } catch (Exception exception) {
@@ -252,10 +261,11 @@ public class MqBrokerHandler extends SimpleChannelInboundHandler {
 
     /**
      * 异步处理消息
-     * @param mqMessage 消息
+     * @param put 消息
      * @since 0.0.3
      */
-    private void asyncHandleMessage(MqMessage mqMessage) {
+    private void asyncHandleMessage(MqMessagePersistPut put) {
+        final MqMessage mqMessage = put.getMqMessage();
         List<Channel> channelList = registerConsumerService.getPushSubscribeList(mqMessage);
         if(CollectionUtil.isEmpty(channelList)) {
             log.info("监听列表为空，忽略处理");
@@ -265,7 +275,7 @@ public class MqBrokerHandler extends SimpleChannelInboundHandler {
         // TODO: service服务等似乎都没实现单例，会重复创建
         BrokerPushContext brokerPushContext = BrokerPushContext.newInstance()
                 .channelList(channelList)
-                .mqMessage(mqMessage)
+                .mqMessagePersistPut(put)
                 .mqBrokerPersist(mqBrokerPersist)
                 .invokeService(invokeService)
                 .respTimeoutMills(respTimeoutMills)

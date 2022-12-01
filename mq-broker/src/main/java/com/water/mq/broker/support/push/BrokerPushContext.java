@@ -1,5 +1,6 @@
 package com.water.mq.broker.support.push;
 
+import com.water.mq.broker.dto.persist.MqMessagePersistPut;
 import com.water.mq.broker.support.persist.IMqBrokerPersist;
 import com.water.mq.common.dto.req.MqMessage;
 import com.water.mq.common.support.invoke.IInvokeService;
@@ -15,7 +16,7 @@ public class BrokerPushContext {
 
     private IMqBrokerPersist mqBrokerPersist;
 
-    private MqMessage mqMessage;
+    private MqMessagePersistPut mqMessagePersistPut;
 
     private List<Channel> channelList;
 
@@ -47,12 +48,12 @@ public class BrokerPushContext {
         return this;
     }
 
-    public MqMessage mqMessage() {
-        return mqMessage;
+    public MqMessagePersistPut mqMessagePersistPut() {
+        return mqMessagePersistPut;
     }
 
-    public BrokerPushContext mqMessage(MqMessage mqMessage) {
-        this.mqMessage = mqMessage;
+    public BrokerPushContext mqMessagePersistPut(MqMessagePersistPut mqMessagePersistPut) {
+        this.mqMessagePersistPut = mqMessagePersistPut;
         return this;
     }
 

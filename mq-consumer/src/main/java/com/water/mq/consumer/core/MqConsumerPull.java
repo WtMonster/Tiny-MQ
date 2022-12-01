@@ -6,7 +6,9 @@ import com.github.houbb.log.integration.core.Log;
 import com.github.houbb.log.integration.core.LogFactory;
 import com.water.mq.common.constant.ConsumerTypeConst;
 import com.water.mq.common.dto.req.MqMessage;
+import com.water.mq.common.dto.resp.MqCommonResp;
 import com.water.mq.common.dto.resp.MqConsumerPullResp;
+import com.water.mq.common.resp.ConsumerStatus;
 import com.water.mq.common.resp.MqCommonRespCode;
 import com.water.mq.consumer.api.IMqConsumerListenerContext;
 import com.water.mq.consumer.dto.MqTopicTagDto;
@@ -100,8 +102,13 @@ public class MqConsumerPull extends MqConsumerPush  {
                         if(CollectionUtil.isNotEmpty(mqMessageList)) {
                             for(MqMessage mqMessage : mqMessageList) {
                                 IMqConsumerListenerContext context = new MqConsumerListenerContext();
+                                final String messageId = mqMessage.getTraceId();
+                                ConsumerStatus consumerStatus = mqListenerService.consumer(mqMessage, context);
+                                log.info("消息：{} 消费结果 {}", messageId, consumerStatus);
 
-                                mqListenerService.consumer(mqMessage, context);
+                                // 状态同步更新
+                                MqCommonResp ackResp = consumerBrokerService.consumerStatusAck(messageId, consumerStatus);
+                                log.info("消息：{} 状态回执结果 {}", messageId, JSON.toJSON(ackResp));
                             }
                         }
                     } else {

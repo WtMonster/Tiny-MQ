@@ -16,9 +16,11 @@ import com.water.mq.broker.utils.InnerChannelUtils;
 import com.water.mq.common.constant.MethodType;
 import com.water.mq.common.dto.req.MqCommonReq;
 import com.water.mq.common.dto.req.MqConsumerPullReq;
+import com.water.mq.common.dto.req.MqConsumerUpdateStatusReq;
 import com.water.mq.common.dto.req.MqHeartBeatReq;
 import com.water.mq.common.dto.resp.MqCommonResp;
 import com.water.mq.common.dto.resp.MqConsumerPullResp;
+import com.water.mq.common.resp.ConsumerStatus;
 import com.water.mq.common.resp.MqCommonRespCode;
 import com.water.mq.common.resp.MqException;
 import com.water.mq.common.rpc.RpcChannelFuture;
@@ -123,7 +125,11 @@ public class ConsumerBrokerService implements IConsumerBrokerService {
      */
     private int unSubscribeMaxAttempt;
 
-
+    /**
+     * 消费状态更新最大尝试次数
+     * @since 0.1.0
+     */
+    private int consumerStatusMaxAttempt;
 
     @Override
     public void initChannelFutureList(ConsumerBrokerConfig config) {
@@ -138,6 +144,7 @@ public class ConsumerBrokerService implements IConsumerBrokerService {
         this.loadBalance = config.loadBalance();
         this.subscribeMaxAttempt = config.subscribeMaxAttempt();
         this.unSubscribeMaxAttempt = config.unSubscribeMaxAttempt();
+        this.consumerStatusMaxAttempt = config.consumerStatusMaxAttempt();
 
         //2. 初始化
         this.channelFutureList = ChannelFutureUtils.initChannelFutureList(brokerAddress,
@@ -359,6 +366,33 @@ public class ConsumerBrokerService implements IConsumerBrokerService {
         Channel channel = getChannel(null);
         return this.callServer(channel, req, MqConsumerPullResp.class);
     }
+
+    @Override
+    public MqCommonResp consumerStatusAck(String messageId, ConsumerStatus consumerStatus) {
+        final MqConsumerUpdateStatusReq req = new MqConsumerUpdateStatusReq();
+        req.setMessageId(messageId);
+        req.setMessageStatus(consumerStatus.getCode());
+
+        final String traceId = IdHelper.uuid32();
+        req.setTraceId(traceId);
+        req.setMethodType(MethodType.C_CONSUMER_STATUS);
+
+        // 重试
+        return Retryer.<MqCommonResp>newInstance()
+                .maxAttempt(consumerStatusMaxAttempt)
+                .callable(new Callable<MqCommonResp>() {
+                    @Override
+                    public MqCommonResp call() throws Exception {
+                        Channel channel = getChannel(null);
+                        MqCommonResp resp = callServer(channel, req, MqCommonResp.class);
+                        if(!MqCommonRespCode.SUCCESS.getCode().equals(resp.getRespCode())) {
+                            throw new MqException(ConsumerRespCode.CONSUMER_STATUS_ACK_FAILED);
+                        }
+                        return resp;
+                    }
+                }).retryCall();
+    }
+
 
     @Override
     public void destroyAll() {

@@ -30,6 +30,10 @@
 
         <!--============================== OTHER ==============================-->
         <dependency>
+            <groupId>com.github.houbb</groupId>
+            <artifactId>sisyphus-core</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
         </dependency>

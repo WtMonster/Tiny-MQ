@@ -23,11 +23,10 @@ public class ProducerMain {
         mqMessage.setTags(Arrays.asList("TAGA", "TAGB"));
         mqMessage.setPayload(message);
 
-        SendResult sendResult = mqProducer.send(mqMessage);
-        mqProducer.send(mqMessage);
-        mqProducer.send(mqMessage);
-
-        System.out.println(JSON.toJSON(sendResult));
+        for(int i = 0; i < 10; i++) {
+            SendResult sendResult = mqProducer.send(mqMessage);
+            System.out.println(JSON.toJSON(sendResult));
+        }
 
         System.exit(0);
     }

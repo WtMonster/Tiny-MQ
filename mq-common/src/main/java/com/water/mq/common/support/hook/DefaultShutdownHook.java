@@ -104,7 +104,7 @@ public class DefaultShutdownHook extends AbstractShutdownHook {
             }
 
             logger.debug("[Shutdown] still remains request, wait for a while.");
-            DateUtil.sleep(2000);
+            DateUtil.sleep(500);
         }
 
         // 从 broker 注销 producer

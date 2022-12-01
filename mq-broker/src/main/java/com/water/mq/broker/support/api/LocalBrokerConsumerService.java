@@ -12,6 +12,7 @@ import com.water.mq.broker.dto.consumer.ConsumerSubscribeBo;
 import com.water.mq.broker.dto.consumer.ConsumerSubscribeReq;
 import com.water.mq.broker.dto.consumer.ConsumerUnSubscribeReq;
 import com.water.mq.broker.utils.InnerChannelUtils;
+import com.water.mq.broker.utils.InnerRegexUtils;
 import com.water.mq.common.dto.req.MqHeartBeatReq;
 import com.water.mq.common.dto.req.MqMessage;
 import com.water.mq.common.dto.resp.MqCommonResp;
@@ -63,6 +64,12 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
      */
     private ILoadBalance<ConsumerSubscribeBo> loadBalance;
 
+    /**
+     * 订阅集合-推送策略
+     * key: topicName
+     * value: 对应的订阅列表
+     */
+    private final Map<String, Set<ConsumerSubscribeBo>> pushSubscribeMap = new ConcurrentHashMap<>();
 
 
     public LocalBrokerConsumerService() {
@@ -133,6 +140,10 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
     public MqCommonResp subscribe(ConsumerSubscribeReq serviceEntry, Channel clientChannel) {
         final String channelId = ChannelUtil.getChannelId(clientChannel);
         final String topicName = serviceEntry.getTopicName();
+
+        final String consumerType = serviceEntry.getConsumerType();
+        Map<String, Set<ConsumerSubscribeBo>> subscribeMap = getSubscribeMapByConsumerType(consumerType);
+
         // 组装消费者
         ConsumerSubscribeBo subscribeBo = new ConsumerSubscribeBo();
         subscribeBo.setChannelId(channelId);
@@ -153,10 +164,16 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
         return resp;
     }
 
+    private Map<String, Set<ConsumerSubscribeBo>> getSubscribeMapByConsumerType(String consumerType) {
+        return pushSubscribeMap;
+    }
+
     @Override
     public MqCommonResp unSubscribe(ConsumerUnSubscribeReq serviceEntry, Channel clientChannel) {
         final String channelId = ChannelUtil.getChannelId(clientChannel);
         final String topicName = serviceEntry.getTopicName();
+        final String consumerType = serviceEntry.getConsumerType();
+        Map<String, Set<ConsumerSubscribeBo>> subscribeMap = getSubscribeMapByConsumerType(consumerType);
 
         ConsumerSubscribeBo subscribeBo = new ConsumerSubscribeBo();
         subscribeBo.setChannelId(channelId);
@@ -177,9 +194,9 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
     }
 
     @Override
-    public List<Channel> getSubscribeList(MqMessage mqMessage) {
+    public List<Channel> getPushSubscribeList(MqMessage mqMessage) {
         final String topicName = mqMessage.getTopic();
-        Set<ConsumerSubscribeBo> set = subscribeMap.get(topicName);
+        Set<ConsumerSubscribeBo> set = pushSubscribeMap.get(topicName);
         if(CollectionUtil.isEmpty(set)) {
             return Collections.emptyList();
         }
@@ -191,7 +208,7 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
         for(ConsumerSubscribeBo bo : set) {
             String tagRegex = bo.getTagRegex();
 
-            if(hasMatch(tagNameList, tagRegex)) {
+            if(InnerRegexUtils.hasMatch(tagNameList, tagRegex)) {
                 //TODO: 这种设置模式，统一添加处理
                 String groupName = bo.getGroupName();
                 List<ConsumerSubscribeBo> list = groupMap.get(groupName);
@@ -243,23 +260,6 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
         entryChannel.setLastAccessTime(mqHeartBeatReq.getTime());
 
         heartbeatMap.put(channelId, entryChannel);
-    }
-
-    private boolean hasMatch(List<String> tagNameList,
-                             String tagRegex) {
-        if(CollectionUtil.isEmpty(tagNameList)) {
-            return false;
-        }
-
-        Pattern pattern = Pattern.compile(tagRegex);
-
-        for(String tagName : tagNameList) {
-            if(RegexUtils.match(pattern, tagName)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
 }

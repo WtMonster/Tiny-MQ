@@ -7,6 +7,7 @@ import com.github.houbb.id.core.util.IdHelper;
 import com.github.houbb.load.balance.api.ILoadBalance;
 import com.github.houbb.log.integration.core.Log;
 import com.github.houbb.log.integration.core.LogFactory;
+import com.github.houbb.sisyphus.core.core.Retryer;
 import com.water.mq.broker.dto.BrokerRegisterReq;
 import com.water.mq.broker.dto.ServiceEntry;
 import com.water.mq.broker.dto.consumer.ConsumerSubscribeReq;
@@ -14,8 +15,10 @@ import com.water.mq.broker.dto.consumer.ConsumerUnSubscribeReq;
 import com.water.mq.broker.utils.InnerChannelUtils;
 import com.water.mq.common.constant.MethodType;
 import com.water.mq.common.dto.req.MqCommonReq;
+import com.water.mq.common.dto.req.MqConsumerPullReq;
 import com.water.mq.common.dto.req.MqHeartBeatReq;
 import com.water.mq.common.dto.resp.MqCommonResp;
+import com.water.mq.common.dto.resp.MqConsumerPullResp;
 import com.water.mq.common.resp.MqCommonRespCode;
 import com.water.mq.common.resp.MqException;
 import com.water.mq.common.rpc.RpcChannelFuture;
@@ -36,6 +39,7 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.handler.codec.DelimiterBasedFrameDecoder;
 
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -107,6 +111,19 @@ public class ConsumerBrokerService implements IConsumerBrokerService {
      */
     private ILoadBalance<RpcChannelFuture> loadBalance;
 
+    /**
+     * 订阅最大尝试次数
+     * @since 0.0.8
+     */
+    private int subscribeMaxAttempt;
+
+    /**
+     * 取消订阅最大尝试次数
+     * @since 0.0.8
+     */
+    private int unSubscribeMaxAttempt;
+
+
 
     @Override
     public void initChannelFutureList(ConsumerBrokerConfig config) {
@@ -119,6 +136,8 @@ public class ConsumerBrokerService implements IConsumerBrokerService {
         this.statusManager = config.statusManager();
         this.mqListenerService = config.mqListenerService();
         this.loadBalance = config.loadBalance();
+        this.subscribeMaxAttempt = config.subscribeMaxAttempt();
+        this.unSubscribeMaxAttempt = config.unSubscribeMaxAttempt();
 
         //2. 初始化
         this.channelFutureList = ChannelFutureUtils.initChannelFutureList(brokerAddress,
@@ -246,7 +265,7 @@ public class ConsumerBrokerService implements IConsumerBrokerService {
     }
 
     @Override
-    public void subscribe(String topicName, String tagRegex) {
+    public void subscribe(String topicName, String tagRegex, String consumerType) {
         ConsumerSubscribeReq req = new ConsumerSubscribeReq();
 
         String messageId = IdHelper.uuid32();
@@ -255,17 +274,28 @@ public class ConsumerBrokerService implements IConsumerBrokerService {
         req.setTopicName(topicName);
         req.setTagRegex(tagRegex);
         req.setGroupName(groupName);
+        req.setConsumerType(consumerType);
 
-        Channel channel = getChannel(null);
-        MqCommonResp resp = callServer(channel, req, MqCommonResp.class);
-        if(!MqCommonRespCode.SUCCESS.getCode().equals(resp.getRespCode())) {
-            throw new MqException(ConsumerRespCode.SUBSCRIBE_FAILED);
-        }
+        // 重试订阅
+        // TODO：没有自定义的重试策略吗
+        Retryer.<String>newInstance()
+                .maxAttempt(subscribeMaxAttempt)
+                .callable(new Callable<String>() {
+                    @Override
+                    public String call() throws Exception {
+                        Channel channel = getChannel(null);
+                        MqCommonResp resp = callServer(channel, req, MqCommonResp.class);
+                        if(!MqCommonRespCode.SUCCESS.getCode().equals(resp.getRespCode())) {
+                            throw new MqException(ConsumerRespCode.SUBSCRIBE_FAILED);
+                        }
+                        return resp.getRespCode();
+                    }
+                }).retryCall();
     }
 
     @Override
-    public void unSubscribe(String topicName, String tagRegex) {
-        ConsumerUnSubscribeReq req = new ConsumerUnSubscribeReq();
+    public void unSubscribe(String topicName, String tagRegex, String consumerType) {
+        final ConsumerUnSubscribeReq req = new ConsumerUnSubscribeReq();
 
         String messageId = IdHelper.uuid32();
         req.setTraceId(messageId);
@@ -273,12 +303,22 @@ public class ConsumerBrokerService implements IConsumerBrokerService {
         req.setTopicName(topicName);
         req.setTagRegex(tagRegex);
         req.setGroupName(groupName);
+        req.setConsumerType(consumerType);
 
-        Channel channel = getChannel(null);
-        MqCommonResp resp = callServer(channel, req, MqCommonResp.class);
-        if(!MqCommonRespCode.SUCCESS.getCode().equals(resp.getRespCode())) {
-            throw new MqException(ConsumerRespCode.UN_SUBSCRIBE_FAILED);
-        }
+        // 重试取消订阅
+        Retryer.<String>newInstance()
+                .maxAttempt(unSubscribeMaxAttempt)
+                .callable(new Callable<String>() {
+                    @Override
+                    public String call() throws Exception {
+                        Channel channel = getChannel(null);
+                        MqCommonResp resp = callServer(channel, req, MqCommonResp.class);
+                        if(!MqCommonRespCode.SUCCESS.getCode().equals(resp.getRespCode())) {
+                            throw new MqException(ConsumerRespCode.UN_SUBSCRIBE_FAILED);
+                        }
+                        return resp.getRespCode();
+                    }
+                }).retryCall();
     }
 
     @Override
@@ -304,6 +344,21 @@ public class ConsumerBrokerService implements IConsumerBrokerService {
         }
     }
 
+    @Override
+    public MqConsumerPullResp pull(String topicName, String tagRegex, int fetchSize) {
+        MqConsumerPullReq req = new MqConsumerPullReq();
+        req.setSize(fetchSize);
+        req.setGroupName(groupName);
+        req.setTagRegex(tagRegex);
+        req.setTopicName(topicName);
+
+        final String traceId = IdHelper.uuid32();
+        req.setTraceId(traceId);
+        req.setMethodType(MethodType.C_MESSAGE_PULL);
+
+        Channel channel = getChannel(null);
+        return this.callServer(channel, req, MqConsumerPullResp.class);
+    }
 
     @Override
     public void destroyAll() {

@@ -11,6 +11,7 @@ import com.water.mq.broker.dto.BrokerRegisterReq;
 import com.water.mq.broker.dto.ServiceEntry;
 import com.water.mq.broker.dto.consumer.ConsumerSubscribeReq;
 import com.water.mq.broker.dto.consumer.ConsumerUnSubscribeReq;
+import com.water.mq.common.constant.ConsumerTypeConst;
 import com.water.mq.common.constant.MethodType;
 import com.water.mq.common.dto.req.MqCommonReq;
 import com.water.mq.common.dto.resp.MqCommonResp;
@@ -57,90 +58,116 @@ import java.util.List;
 public class MqConsumerPush  extends Thread implements IMqConsumer{
     private static final Log log = LogFactory.getLog(MqConsumerPush.class);
 
+
     /**
      * 组名称
      */
-    private String groupName = ConsumerConst.DEFAULT_GROUP_NAME;
+    protected String groupName = ConsumerConst.DEFAULT_GROUP_NAME;
 
     /**
      * 中间人地址
      */
-    private String brokerAddress  = "127.0.0.1:9999";
+    protected String brokerAddress  = "127.0.0.1:9999";
 
     /**
      * 获取响应超时时间
      * @since 0.0.2
      */
-    private long respTimeoutMills = 5000;
+    protected long respTimeoutMills = 5000;
 
     /**
      * 检测 broker 可用性
      * @since 0.0.4
      */
-    private volatile boolean check = true;
+    protected volatile boolean check = true;
 
     /**
      * 为剩余的请求等待时间
      * @since 0.0.5
      */
-    private long waitMillsForRemainRequest = 60 * 1000;
+    protected long waitMillsForRemainRequest = 60 * 1000;
 
     /**
      * 调用管理类
      *
      * @since 1.0.0
      */
-    private final IInvokeService invokeService = new InvokeService();
+    protected final IInvokeService invokeService = new InvokeService();
 
     /**
      * 消息监听服务类
      * @since 0.0.5
      */
-    private final IMqListenerService mqListenerService = new MqListenerService();
+    protected final IMqListenerService mqListenerService = new MqListenerService();
 
     /**
      * 状态管理类
      * @since 0.0.5
      */
-    private final IStatusManager statusManager = new StatusManager();
+    protected final IStatusManager statusManager = new StatusManager();
 
     /**
      * 生产者-中间服务端服务类
      * @since 0.0.5
      */
-    private final IConsumerBrokerService consumerBrokerService = new ConsumerBrokerService();
+    protected final IConsumerBrokerService consumerBrokerService = new ConsumerBrokerService();
 
     /**
      * 负载均衡策略
      * @since 0.0.7
      */
-    private ILoadBalance<RpcChannelFuture> loadBalance = LoadBalances.weightRoundRobbin();
+    protected ILoadBalance<RpcChannelFuture> loadBalance = LoadBalances.weightRoundRobbin();
 
-    public void setLoadBalance(ILoadBalance<RpcChannelFuture> loadBalance) {
-        ArgUtil.notNull(loadBalance, "loadBalance");
+    /**
+     * 订阅最大尝试次数
+     * @since 0.0.8
+     */
+    protected int subscribeMaxAttempt = 3;
 
-        this.loadBalance = loadBalance;
+    /**
+     * 取消订阅最大尝试次数
+     * @since 0.0.8
+     */
+    protected int unSubscribeMaxAttempt = 3;
+
+    public MqConsumerPush subscribeMaxAttempt(int subscribeMaxAttempt) {
+        this.subscribeMaxAttempt = subscribeMaxAttempt;
+        return this;
     }
 
+    public MqConsumerPush unSubscribeMaxAttempt(int unSubscribeMaxAttempt) {
+        this.unSubscribeMaxAttempt = unSubscribeMaxAttempt;
+        return this;
+    }
 
-    public void setGroupName(String groupName) {
+    public MqConsumerPush groupName(String groupName) {
         this.groupName = groupName;
+        return this;
     }
 
-    public void setWaitMillsForRemainRequest(long waitMillsForRemainRequest) {
-        this.waitMillsForRemainRequest = waitMillsForRemainRequest;
-    }
-
-    public void setRespTimeoutMills(long respTimeoutMills) {
-        this.respTimeoutMills = respTimeoutMills;
-    }
-
-    public void setBrokerAddress(String brokerAddress) {
+    public MqConsumerPush brokerAddress(String brokerAddress) {
         this.brokerAddress = brokerAddress;
+        return this;
     }
 
-    public void setCheck(boolean check) {
+    public MqConsumerPush respTimeoutMills(long respTimeoutMills) {
+        this.respTimeoutMills = respTimeoutMills;
+        return this;
+    }
+
+    public MqConsumerPush check(boolean check) {
         this.check = check;
+        return this;
+    }
+
+    public MqConsumerPush waitMillsForRemainRequest(long waitMillsForRemainRequest) {
+        this.waitMillsForRemainRequest = waitMillsForRemainRequest;
+        return this;
+    }
+
+    public MqConsumerPush loadBalance(ILoadBalance<RpcChannelFuture> loadBalance) {
+        this.loadBalance = loadBalance;
+        return this;
     }
 
     /**
@@ -172,7 +199,9 @@ public class MqConsumerPush  extends Thread implements IMqConsumer{
                     .statusManager(statusManager)
                     .mqListenerService(mqListenerService)
                     .mqListenerService(mqListenerService)
-                    .loadBalance(loadBalance);
+                    .loadBalance(loadBalance)
+                    .subscribeMaxAttempt(subscribeMaxAttempt)
+                    .unSubscribeMaxAttempt(unSubscribeMaxAttempt);
 
             //1. 初始化
             this.consumerBrokerService.initChannelFutureList(config);
@@ -191,6 +220,9 @@ public class MqConsumerPush  extends Thread implements IMqConsumer{
             rpcShutdownHook.setDestroyable(this.consumerBrokerService);
             ShutdownHooks.rpcShutdownHook(rpcShutdownHook);
 
+            //5. 启动完成以后的事件
+            this.afterInit();
+
             log.info("MQ 消费者启动完成");
         } catch (Exception e) {
             log.error("MQ 消费者启动异常", e);
@@ -199,18 +231,37 @@ public class MqConsumerPush  extends Thread implements IMqConsumer{
     }
 
 
+
+    /**
+     * 初始化完成以后
+     */
+    protected void afterInit() {
+
+    }
+
     @Override
     public void subscribe(String topicName, String tagRegex) {
-        consumerBrokerService.subscribe(topicName, tagRegex);
+        final String consumerType = getConsumerType();
+        consumerBrokerService.subscribe(topicName, tagRegex, consumerType);
     }
 
     @Override
     public void unSubscribe(String topicName, String tagRegex) {
-        consumerBrokerService.unSubscribe(topicName, tagRegex);
+        final String consumerType = getConsumerType();
+        consumerBrokerService.unSubscribe(topicName, tagRegex, consumerType);
     }
 
     @Override
     public void registerListener(IMqConsumerListener listener) {
         this.mqListenerService.register(listener);
+    }
+
+    /**
+     * 获取消费策略类型
+     * @return 类型
+     * @since 0.0.9
+     */
+    protected String getConsumerType() {
+        return ConsumerTypeConst.PUSH;
     }
 }

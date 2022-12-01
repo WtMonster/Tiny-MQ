@@ -2,31 +2,31 @@ package com.water.mq.broker.support.api;
 
 import com.alibaba.fastjson.JSON;
 import com.github.houbb.heaven.util.util.CollectionUtil;
+import com.github.houbb.heaven.util.util.MapUtil;
+import com.github.houbb.heaven.util.util.regex.RegexUtil;
 import com.github.houbb.load.balance.api.ILoadBalance;
 import com.github.houbb.log.integration.core.Log;
 import com.github.houbb.log.integration.core.LogFactory;
 import com.water.mq.broker.api.IBrokerConsumerService;
 import com.water.mq.broker.dto.BrokerServiceEntryChannel;
+import com.water.mq.broker.dto.ChannelGroupNameDto;
 import com.water.mq.broker.dto.ServiceEntry;
 import com.water.mq.broker.dto.consumer.ConsumerSubscribeBo;
 import com.water.mq.broker.dto.consumer.ConsumerSubscribeReq;
 import com.water.mq.broker.dto.consumer.ConsumerUnSubscribeReq;
 import com.water.mq.broker.utils.InnerChannelUtils;
-import com.water.mq.broker.utils.InnerRegexUtils;
 import com.water.mq.common.dto.req.MqHeartBeatReq;
 import com.water.mq.common.dto.req.MqMessage;
 import com.water.mq.common.dto.resp.MqCommonResp;
 import com.water.mq.common.resp.MqCommonRespCode;
 import com.water.mq.common.util.ChannelUtil;
 import com.water.mq.common.util.RandomUtils;
-import com.water.mq.common.util.RegexUtils;
 import io.netty.channel.Channel;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 
 /**
  * @author binbin.hou
@@ -151,12 +151,10 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
         subscribeBo.setTopicName(topicName);
         subscribeBo.setTagRegex(serviceEntry.getTagRegex());
 
-        Set<ConsumerSubscribeBo> set = subscribeMap.get(topicName);
-        if(set == null) {
-            set = new HashSet<>();
-            subscribeMap.put(topicName, set);
-        }
-        set.add(subscribeBo);
+
+        // 放入集合
+        // TODO: 看看这里的简化
+        MapUtil.putToSetMap(subscribeMap, topicName, subscribeBo);
 
         MqCommonResp resp = new MqCommonResp();
         resp.setRespCode(MqCommonRespCode.SUCCESS.getCode());
@@ -194,7 +192,7 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
     }
 
     @Override
-    public List<Channel> getPushSubscribeList(MqMessage mqMessage) {
+    public List<ChannelGroupNameDto> getPushSubscribeList(MqMessage mqMessage) {
         final String topicName = mqMessage.getTopic();
         Set<ConsumerSubscribeBo> set = pushSubscribeMap.get(topicName);
         if(CollectionUtil.isEmpty(set)) {
@@ -208,22 +206,16 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
         for(ConsumerSubscribeBo bo : set) {
             String tagRegex = bo.getTagRegex();
 
-            if(InnerRegexUtils.hasMatch(tagNameList, tagRegex)) {
-                //TODO: 这种设置模式，统一添加处理
+            if(RegexUtil.hasMatch(tagNameList, tagRegex)) {
                 String groupName = bo.getGroupName();
-                List<ConsumerSubscribeBo> list = groupMap.get(groupName);
-                if(list == null) {
-                    list = new ArrayList<>();
-                }
-                list.add(bo);
 
-                groupMap.put(groupName, list);
+                MapUtil.putToListMap(groupMap, groupName, bo);
             }
         }
 
         //3. 按照 groupName 分组之后，每一组只随机返回一个。最好应该调整为以 shardingkey 选择
         final String shardingKey = mqMessage.getShardingKey();
-        List<Channel> channelList = new ArrayList<>();
+        List<ChannelGroupNameDto> channelGroupNameList = new ArrayList<>();
 
         for(Map.Entry<String, List<ConsumerSubscribeBo>> entry : groupMap.entrySet()) {
             List<ConsumerSubscribeBo> list = entry.getValue();
@@ -235,10 +227,13 @@ public class LocalBrokerConsumerService implements IBrokerConsumerService {
                 log.warn("channelId: {} 对应的通道信息为空", channelId);
                 continue;
             }
-            channelList.add(entryChannel.getChannel());
+            final String groupName = entry.getKey();
+            ChannelGroupNameDto channelGroupNameDto = ChannelGroupNameDto.of(groupName,
+                    entryChannel.getChannel());
+            channelGroupNameList.add(channelGroupNameDto);
         }
 
-        return channelList;
+        return channelGroupNameList;
     }
 
     /**

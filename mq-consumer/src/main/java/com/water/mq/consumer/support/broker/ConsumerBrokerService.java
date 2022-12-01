@@ -372,6 +372,7 @@ public class ConsumerBrokerService implements IConsumerBrokerService {
         final MqConsumerUpdateStatusReq req = new MqConsumerUpdateStatusReq();
         req.setMessageId(messageId);
         req.setMessageStatus(consumerStatus.getCode());
+        req.setConsumerGroupName(groupName);
 
         final String traceId = IdHelper.uuid32();
         req.setTraceId(traceId);

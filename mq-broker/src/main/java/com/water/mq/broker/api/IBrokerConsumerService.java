@@ -6,6 +6,7 @@
 package com.water.mq.broker.api;
 
 import com.github.houbb.load.balance.api.ILoadBalance;
+import com.water.mq.broker.dto.ChannelGroupNameDto;
 import com.water.mq.broker.dto.ServiceEntry;
 import com.water.mq.broker.dto.consumer.ConsumerSubscribeBo;
 import com.water.mq.broker.dto.consumer.ConsumerSubscribeReq;
@@ -85,7 +86,7 @@ public interface IBrokerConsumerService {
      * @param mqMessage 消息体
      * @return 结果
      */
-    List<Channel> getPushSubscribeList(MqMessage mqMessage);
+    List<ChannelGroupNameDto> getPushSubscribeList(MqMessage mqMessage);
 
     /**
      * 心跳

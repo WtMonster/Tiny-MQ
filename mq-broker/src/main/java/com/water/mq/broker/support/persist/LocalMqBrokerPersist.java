@@ -2,10 +2,11 @@ package com.water.mq.broker.support.persist;
 
 import com.alibaba.fastjson.JSON;
 import com.github.houbb.heaven.util.util.CollectionUtil;
+import com.github.houbb.heaven.util.util.MapUtil;
+import com.github.houbb.heaven.util.util.regex.RegexUtil;
 import com.github.houbb.log.integration.core.Log;
 import com.github.houbb.log.integration.core.LogFactory;
 import com.water.mq.broker.dto.persist.MqMessagePersistPut;
-import com.water.mq.broker.utils.InnerRegexUtils;
 import com.water.mq.common.constant.MessageStatusConst;
 import com.water.mq.common.dto.req.MqConsumerPullReq;
 import com.water.mq.common.dto.req.MqMessage;
@@ -47,20 +48,8 @@ public class LocalMqBrokerPersist implements IMqBrokerPersist {
         // TODO: 这里final的意义是什么？
         final String topic = mqMessage.getTopic();
 
-        List<MqMessagePersistPut> list = map.get(topic);
-        if (list == null) {
-            list = new ArrayList<>();
-        }
-        list.add(put);
-        // TODO: 这里似乎可以改写成如下代码,有时可以减少一次put操作
-        /**
-         * if (list == null) {
-         *     list = new ArrayList<>();
-         *     map.put(topic, list);
-         * }
-         * list.add(put);
-         */
-        map.put(topic, list);
+        // 放入元素
+        MapUtil.putToListMap(map, topic, put);
 
         MqCommonResp commonResp = new MqCommonResp();
         commonResp.setRespCode(MqCommonRespCode.SUCCESS.getCode());
@@ -69,7 +58,9 @@ public class LocalMqBrokerPersist implements IMqBrokerPersist {
     }
 
     @Override
-    public MqCommonResp updateStatus(String messageId, String status) {
+    public MqCommonResp updateStatus(String messageId,
+                                     String consumerGroupName,
+                                     String status) {
         // 这里性能比较差，所以不可以用于生产。仅作为测试验证
         // TODO: 改进复杂度
         for (List<MqMessagePersistPut> list : map.values()) {
@@ -112,7 +103,7 @@ public class LocalMqBrokerPersist implements IMqBrokerPersist {
 
                 final MqMessage mqMessage = put.getMqMessage();
                 List<String> tagList = mqMessage.getTags();
-                if(InnerRegexUtils.hasMatch(tagList, tagRegex)) {
+                if(RegexUtil.hasMatch(tagList, tagRegex)) {
                     // 设置为处理中
                     // TODO： 消息的最终状态什么时候更新呢？
                     // 可以给 broker 一个 ACK

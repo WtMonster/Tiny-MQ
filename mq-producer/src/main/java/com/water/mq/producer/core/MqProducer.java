@@ -32,6 +32,7 @@ import com.water.mq.producer.api.IMqProducer;
 import com.water.mq.producer.constant.ProducerConst;
 import com.water.mq.producer.constant.ProducerRespCode;
 import com.water.mq.producer.constant.SendStatus;
+import com.water.mq.producer.dto.SendBatchResult;
 import com.water.mq.producer.dto.SendResult;
 import com.water.mq.producer.handler.MqProducerHandler;
 import com.water.mq.producer.support.broker.IProducerBrokerService;
@@ -204,6 +205,16 @@ public class MqProducer extends Thread implements IMqProducer {
     @Override
     public SendResult sendOneWay(MqMessage mqMessage) {
         return this.producerBrokerService.sendOneWay(mqMessage);
+    }
+
+    @Override
+    public SendBatchResult sendBatch(List<MqMessage> mqMessageList) {
+        return producerBrokerService.sendBatch(mqMessageList);
+    }
+
+    @Override
+    public SendBatchResult sendOneWayBatch(List<MqMessage> mqMessageList) {
+        return producerBrokerService.sendOneWayBatch(mqMessageList);
     }
 
 }

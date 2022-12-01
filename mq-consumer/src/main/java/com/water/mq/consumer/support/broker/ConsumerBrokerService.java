@@ -14,10 +14,8 @@ import com.water.mq.broker.dto.consumer.ConsumerSubscribeReq;
 import com.water.mq.broker.dto.consumer.ConsumerUnSubscribeReq;
 import com.water.mq.broker.utils.InnerChannelUtils;
 import com.water.mq.common.constant.MethodType;
-import com.water.mq.common.dto.req.MqCommonReq;
-import com.water.mq.common.dto.req.MqConsumerPullReq;
-import com.water.mq.common.dto.req.MqConsumerUpdateStatusReq;
-import com.water.mq.common.dto.req.MqHeartBeatReq;
+import com.water.mq.common.dto.req.*;
+import com.water.mq.common.dto.req.component.MqConsumerUpdateStatusDto;
 import com.water.mq.common.dto.resp.MqCommonResp;
 import com.water.mq.common.dto.resp.MqConsumerPullResp;
 import com.water.mq.common.resp.ConsumerStatus;
@@ -394,6 +392,30 @@ public class ConsumerBrokerService implements IConsumerBrokerService {
                 }).retryCall();
     }
 
+    @Override
+    public MqCommonResp consumerStatusAckBatch(List<MqConsumerUpdateStatusDto> statusDtoList) {
+        final MqConsumerUpdateStatusBatchReq req = new MqConsumerUpdateStatusBatchReq();
+        req.setStatusList(statusDtoList);
+
+        final String traceId = IdHelper.uuid32();
+        req.setTraceId(traceId);
+        req.setMethodType(MethodType.C_CONSUMER_STATUS_BATCH);
+
+        // 重试
+        return Retryer.<MqCommonResp>newInstance()
+                .maxAttempt(consumerStatusMaxAttempt)
+                .callable(new Callable<MqCommonResp>() {
+                    @Override
+                    public MqCommonResp call() throws Exception {
+                        Channel channel = getChannel(null);
+                        MqCommonResp resp = callServer(channel, req, MqCommonResp.class);
+                        if(!MqCommonRespCode.SUCCESS.getCode().equals(resp.getRespCode())) {
+                            throw new MqException(ConsumerRespCode.CONSUMER_STATUS_ACK_BATCH_FAILED);
+                        }
+                        return resp;
+                    }
+                }).retryCall();
+    }
 
     @Override
     public void destroyAll() {

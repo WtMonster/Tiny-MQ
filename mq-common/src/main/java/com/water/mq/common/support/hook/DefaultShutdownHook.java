@@ -94,6 +94,7 @@ public class DefaultShutdownHook extends AbstractShutdownHook {
         logger.info("[Shutdown] set status to wait for shutdown.");
 
         // 循环等待当前执行的请求执行完成
+        // TODO: 这里可能需要停止请求的接收
         long startMills = System.currentTimeMillis();
         while (invokeService.remainsRequest()) {
             long currentMills = System.currentTimeMillis();

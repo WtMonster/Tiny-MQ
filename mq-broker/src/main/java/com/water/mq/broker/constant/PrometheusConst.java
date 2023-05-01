@@ -5,4 +5,7 @@ package com.water.mq.broker.constant;
  * @date 2023/4/27 14:11
  */
 public class PrometheusConst {
+
+    // public static final String
+
 }

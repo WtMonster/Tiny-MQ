@@ -1,4 +1,4 @@
-package producer;
+package com.water.mq.producer;
 
 import com.alibaba.fastjson.JSON;
 import com.water.mq.common.dto.req.MqMessage;
@@ -20,7 +20,7 @@ public class ProducerMainBatch {
         mqProducer.start();
 
         List<MqMessage> mqMessageList = new ArrayList<>();
-        for(int i = 0; i < 20; i++) {
+        for (int i = 0; i < 20; i++) {
             MqMessage mqMessage = buildMessage(i);
             mqMessageList.add(mqMessage);
         }

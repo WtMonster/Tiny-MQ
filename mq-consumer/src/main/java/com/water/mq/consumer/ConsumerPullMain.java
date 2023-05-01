@@ -1,4 +1,4 @@
-package consumer;
+package com.water.mq.consumer;
 
 import com.alibaba.fastjson.JSON;
 import com.water.mq.common.dto.req.MqMessage;
